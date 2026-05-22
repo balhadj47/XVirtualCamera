@@ -6,10 +6,7 @@ import android.app.Instrumentation
 import android.content.res.XModuleResources
 import android.content.res.XResources
 import com.sandyz.virtualcam.hooks.IHook
-import com.sandyz.virtualcam.hooks.VirtualCameraBiliSmile
-import com.sandyz.virtualcam.hooks.VirtualCameraDy
 import com.sandyz.virtualcam.hooks.VirtualCameraPdd
-import com.sandyz.virtualcam.hooks.VirtualCameraWs
 import com.sandyz.virtualcam.utils.HookUtils
 import com.sandyz.virtualcam.utils.xLog
 import de.robv.android.xposed.IXposedHookInitPackageResources
@@ -76,10 +73,7 @@ class HookMain : IXposedHookLoadPackage, IXposedHookZygoteInit, IXposedHookInitP
     }
 
     private val hooks = listOf(
-        VirtualCameraBiliSmile(),
-        VirtualCameraDy(),
         VirtualCameraPdd(),
-        VirtualCameraWs(),
     )
 
 
@@ -90,19 +84,9 @@ class HookMain : IXposedHookLoadPackage, IXposedHookZygoteInit, IXposedHookInitP
 
     override fun handleInitPackageResources(resparam: XC_InitPackageResources.InitPackageResourcesParam?) {
         xResources = resparam?.res
-        var supported = (resparam?.packageName == "com.sandyz.virtualcam")
+        val modRes = XModuleResources.createInstance(moduleRes, resparam?.res)
         hooks.forEach {
-            it.getSupportedPackages().forEach { pkg ->
-                if (pkg == resparam?.packageName) {
-                    supported = true
-                }
-            }
-        }
-        if (supported) {
-            val modRes = XModuleResources.createInstance(moduleRes, resparam?.res)
-            hooks.forEach {
-                it.registerRes(modRes)
-            }
+            it.registerRes(modRes)
         }
     }
 
@@ -110,23 +94,13 @@ class HookMain : IXposedHookLoadPackage, IXposedHookZygoteInit, IXposedHookInitP
         HookUtils.init(lpparam)
 
         hooks.forEach {
-            var supported = (lpparam.packageName == "com.sandyz.virtualcam")
-            it.getSupportedPackages().forEach { pkg ->
-                if (pkg == lpparam.packageName) {
-                    supported = true
+            xLog("init>>>>${it.getName()}>>>> package: ${lpparam.packageName} process: ${lpparam.processName}")
+            loadNative()
+            XposedHelpers.findAndHookMethod(Instrumentation::class.java, "callApplicationOnCreate", Application::class.java, object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    init(it, lpparam)
                 }
-            }
-            if (!supported) {
-                 xLog("init>>>>${it.getName()}>>>> unsupported! ===================== package: ${lpparam?.packageName} process: ${lpparam?.processName}")
-            } else {
-                xLog("init>>>>${it.getName()}>>>> package: ${lpparam.packageName} process: ${lpparam.processName}")
-                loadNative()
-                XposedHelpers.findAndHookMethod(Instrumentation::class.java, "callApplicationOnCreate", Application::class.java, object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        init(it, lpparam)
-                    }
-                })
-            }
+            })
         }
     }
 
